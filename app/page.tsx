@@ -110,13 +110,6 @@ export default function HomePage() {
             >
               {/* Left — Copy */}
               <div>
-                <motion.div variants={fadeUp} className="mb-4">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-accent)] bg-[var(--color-accent-muted)] px-3 py-1 rounded-full">
-                    <Sparkles className="w-3 h-3" />
-                    AI Prompt Optimization
-                  </span>
-                </motion.div>
-
                 <motion.h1
                   variants={fadeUp}
                   className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] text-[var(--color-ink)] mb-5"
