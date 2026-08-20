@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Catalyx AI - Technical Deep Dive</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.0/github-markdown-light.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      min-width: 200px;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 45px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    @page {
+      size: A4;
+      margin: 20mm 15mm 20mm 15mm;
+    }
+    .markdown-body pre {
+      background-color: #f6f8fa;
+      border-radius: 6px;
+      padding: 16px;
+    }
+    .markdown-body img {
+      max-width: 100%;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .mermaid {
+      text-align: center;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body class="markdown-body">
+  <h1>Catalyx AI — Technical Deep Dive</h1>
+<p><strong>From Vague Ideas to Production-Ready Master Prompts</strong></p>
+<blockquote>
+<p>This document explains every architectural decision, every line of prompt engineering, every TypeScript pattern, and every design choice that powers Catalyx AI. Written for someone who wants to understand not just <em>what</em> was built, but <em>why</em> every decision was made.</p>
+</blockquote>
+<p><img src="C:/Users/techa/.gemini/antigravity-ide/brain/1602f463-6da6-4c0f-95eb-3cbdc9f190d5/preview.png" alt="Catalyx AI Preview"></p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#the-problem">The Problem</a></li>
+<li><a href="#the-solution">The Solution</a></li>
+<li><a href="#system-architecture">System Architecture</a></li>
+<li><a href="#tech-stack">Tech Stack — And Why Each Piece</a></li>
+<li><a href="#the-5-step-user-flow">The 5-Step User Flow</a></li>
+<li><a href="#prompt-engineering">Prompt Engineering — The AI Brain</a></li>
+<li><a href="#api-routes">API Routes — The Backend Engine</a></li>
+<li><a href="#state-management">State Management — The Finite State Machine</a></li>
+<li><a href="#typescript-architecture">TypeScript Architecture — Why Types Matter</a></li>
+<li><a href="#design-system">The Design System — Color Science and OKLCH</a></li>
+<li><a href="#component-architecture">Component Architecture</a></li>
+<li><a href="#custom-hooks">Custom Hooks</a></li>
+<li><a href="#how-catalyx-ai-stands-out">How Catalyx AI Stands Out</a></li>
+<li><a href="#repository-structure">Repository Structure</a></li>
+</ol>
+<hr>
+<h2>The Problem</h2>
+<p>Every developer using AI coding assistants (Cursor, Bolt, Lovable, Claude Code, Gemini CLI, ChatGPT) faces the same problem:</p>
+<p><strong>Garbage in, garbage out.</strong></p>
+<p>When a developer types <em>&quot;build me a website&quot;</em>, the AI produces a generic React template with no authentication, no database schema, no error handling, no accessibility, no deployment strategy, and no acceptance criteria. The developer then spends hours iterating — adding missing requirements one by one — because the original prompt was vague.</p>
+<p>The root cause is not the AI. It&#39;s the <strong>prompt</strong>. Most developers are not prompt engineers. They don&#39;t know what information an AI coding assistant needs to produce production-ready code on the first try.</p>
+<hr>
+<h2>The Solution</h2>
+<p>Catalyx AI solves this by acting as a <strong>prompt architect</strong>. It doesn&#39;t generate code — it generates the <em>prompt</em> that generates the code.</p>
+<p>The workflow is:</p>
+<ol>
+<li><strong>User enters a vague idea</strong> → &quot;Build me an ecommerce website&quot;</li>
+<li><strong>Catalyx AI scores it</strong> → 20/100 (missing tech stack, auth, database, features, design, deployment)</li>
+<li><strong>Catalyx AI interviews the user</strong> → 5-8 adaptive questions with multi-select options</li>
+<li><strong>Catalyx AI generates a Master Prompt</strong> → A 2000+ word, 17-section engineering brief</li>
+<li><strong>User copies the Master Prompt</strong> → Pastes it into Cursor, Bolt, Claude Code, etc.</li>
+</ol>
+<p>The result: prompt scores jump from ~20 to ~95, and the AI coding assistant produces dramatically better output on the first try.</p>
+<hr>
+<h2>System Architecture</h2>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;Client (Browser)&quot;
+        LP[&quot;Landing Page&lt;br/&gt;(app/page.tsx)&quot;]
+        OP[&quot;Optimize Page&lt;br/&gt;(app/optimize/page.tsx)&quot;]
+        OF[&quot;OptimizeFlow Component&lt;br/&gt;(optimize-flow.tsx)&quot;]
+        CTX[&quot;FlowProvider Context&lt;br/&gt;(lib/store.tsx)&quot;]
+        
+        OP --&gt; CTX
+        CTX --&gt; OF
+    end
+    
+    subgraph &quot;Next.js Server (API Routes)&quot;
+        A1[&quot;POST /api/analyze&quot;]
+        A2[&quot;POST /api/interview&quot;]
+        A3[&quot;POST /api/generate&quot;]
+    end
+    
+    subgraph &quot;External AI&quot;
+        GROQ[&quot;Groq API&lt;br/&gt;llama-3.3-70b-versatile&quot;]
+    end
+    
+    OF --&gt;|&quot;Step 1: Send prompt&quot;| A1
+    A1 --&gt;|&quot;System prompt + user prompt&quot;| GROQ
+    GROQ --&gt;|&quot;JSON: score + questions&quot;| A1
+    A1 --&gt;|&quot;AnalysisResult&quot;| OF
+    
+    OF --&gt;|&quot;Step 3: Send answers&quot;| A2
+    A2 --&gt;|&quot;Follow-up questions&quot;| GROQ
+    
+    OF --&gt;|&quot;Step 4: Send all context&quot;| A3
+    A3 --&gt;|&quot;Full generation prompt&quot;| GROQ
+    GROQ --&gt;|&quot;JSON: 14 sections + Master Prompt&quot;| A3
+    A3 --&gt;|&quot;GenerationResult&quot;| OF
+</code></pre>
+<h3>Why This Architecture?</h3>
+<p><strong>Next.js App Router</strong> was chosen because:</p>
+<ul>
+<li><strong>API Routes run server-side</strong>: The Groq API key never touches the browser. It stays in <code>process.env.GROQ_API_KEY</code> on the server. If we used a client-side architecture, the API key would be exposed in the browser&#39;s network tab.</li>
+<li><strong>Static + Dynamic coexistence</strong>: The landing page (<code>/</code>) and optimize page shell (<code>/optimize</code>) are statically pre-rendered at build time (zero JS for the HTML shell). The API routes (<code>/api/*</code>) are dynamic and run only when called.</li>
+<li><strong>No separate backend needed</strong>: Next.js collocates the frontend and backend in a single deployment. No Express server, no separate API project, no CORS configuration.</li>
+</ul>
+<hr>
+<h2>Tech Stack</h2>
+<table>
+<thead>
+<tr>
+<th>Technology</th>
+<th>Version</th>
+<th>Why This Specifically?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Next.js</strong></td>
+<td>16.2.12</td>
+<td>App Router with Turbopack. Server-side API routes keep the Groq key safe. Static pre-rendering for the landing page means instant load.</td>
+</tr>
+<tr>
+<td><strong>React</strong></td>
+<td>19.2.4</td>
+<td>Latest stable. Needed for <code>useReducer</code>, <code>useContext</code>, and <code>useCallback</code> patterns used in the state machine.</td>
+</tr>
+<tr>
+<td><strong>TypeScript</strong></td>
+<td>5.x</td>
+<td>Strict mode enabled. Every API response, every state transition, every component prop is typed. This prevents an entire class of runtime bugs.</td>
+</tr>
+<tr>
+<td><strong>Tailwind CSS</strong></td>
+<td>4.x</td>
+<td>Utility-first CSS. v4 uses <code>@theme inline</code> for design token integration and <code>@import &quot;tailwindcss&quot;</code> instead of the v3 <code>@tailwind</code> directives.</td>
+</tr>
+<tr>
+<td><strong>Framer Motion</strong></td>
+<td>12.x</td>
+<td>Physics-based animations. Used for page transitions, score gauge animations, loading stage sequences, and interview card enter/exit.</td>
+</tr>
+<tr>
+<td><strong>Groq SDK</strong></td>
+<td>0.15.x</td>
+<td>The fastest LLM inference API available. Groq&#39;s custom LPU hardware delivers ~500 tokens/second vs ~80 tokens/second on OpenAI. This means the Master Prompt (which can be 2000+ tokens) generates in ~4 seconds instead of ~25 seconds.</td>
+</tr>
+<tr>
+<td><strong>llama-3.3-70b-versatile</strong></td>
+<td>—</td>
+<td>Meta&#39;s 70B parameter model via Groq. Chosen over smaller models because the Master Prompt generation requires complex reasoning across 17 sections, and smaller models produce incomplete or inconsistent output.</td>
+</tr>
+<tr>
+<td><strong>Lucide React</strong></td>
+<td>0.511.x</td>
+<td>Tree-shakeable icon library. Only icons actually used are included in the bundle.</td>
+</tr>
+<tr>
+<td><strong>Sonner</strong></td>
+<td>2.x</td>
+<td>Toast notifications. Minimal API: <code>toast.success(&quot;Copied&quot;)</code>. Styled to match the dark theme via <code>toastOptions</code>.</td>
+</tr>
+<tr>
+<td><strong>clsx + tailwind-merge</strong></td>
+<td>—</td>
+<td><code>cn()</code> utility. <code>clsx</code> handles conditional classes. <code>tailwind-merge</code> deduplicates conflicting Tailwind classes (e.g., <code>px-4 px-6</code> → <code>px-6</code>).</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The 5-Step User Flow</h2>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; Input
+    Input --&gt; Analyzing: User submits prompt
+    Analyzing --&gt; Interview: Score shown, 2.5s pause
+    Interview --&gt; Interview: Answer question (next Q)
+    Interview --&gt; Generating: All questions answered
+    Generating --&gt; Results: Loading stages complete
+    Results --&gt; Input: Start Over
+    
+    Analyzing --&gt; Input: Error (retry)
+    Generating --&gt; Input: Error (retry)
+</code></pre>
+<h3>Step 1: Input</h3>
+<p>The user types or pastes their idea into a textarea. Five example prompts are shown as clickable pills for quick testing. A keyboard shortcut (<code>Cmd+Enter</code> / <code>Ctrl+Enter</code>) triggers analysis.</p>
+<p><strong>Why example prompts?</strong> First-time users don&#39;t know what to type. Examples reduce friction and show the expected input format.</p>
+<p><strong>Why Cmd+Enter?</strong> Power users (developers) expect keyboard shortcuts. This is the standard &quot;submit&quot; shortcut in tools like Slack, Linear, and VS Code.</p>
+<h3>Step 2: Analyzing</h3>
+<p>The prompt is sent to <code>POST /api/analyze</code>. A spinning Sparkles icon and loading text are shown. When the response arrives, the initial score is displayed in an animated circular gauge (SVG ring with <code>strokeDashoffset</code> animation). Missing requirements are shown as red pills. After 2.5 seconds, the view auto-transitions to the interview.</p>
+<p><strong>Why the 2.5s pause?</strong> If we immediately jumped to the interview, the user would never see their score or understand why they&#39;re being asked questions. The pause creates a &quot;reveal moment&quot; — the user sees their score (usually embarrassingly low, like 20/100), sees the red pills listing what&#39;s missing, and <em>understands why the interview matters</em>.</p>
+<h3>Step 3: Interview</h3>
+<p>The AI-generated questions are displayed one at a time using the <code>InterviewCard</code> component. Three question types are supported:</p>
+<ul>
+<li><strong>Single-select (radio)</strong>: User picks one option. Auto-advances after 300ms. No &quot;Continue&quot; button needed.</li>
+<li><strong>Multi-select (checkbox)</strong>: User picks multiple options. Must click &quot;Continue&quot; to advance.</li>
+<li><strong>Text</strong>: Free-form input. Enter key submits (Shift+Enter for newlines). Must click &quot;Continue&quot; to advance.</li>
+</ul>
+<p>A progress bar shows <code>currentQuestion / totalQuestions</code> with an animated fill.</p>
+<p><strong>Why auto-advance on single-select?</strong> Removing the &quot;Continue&quot; click for single-select saves one click per question. Over 6 questions, that&#39;s 6 fewer clicks. This is a UX pattern borrowed from Typeform.</p>
+<p><strong>Why the &quot;Skip&quot; button?</strong> Not every question is relevant. If the user doesn&#39;t know or doesn&#39;t care about a particular question, forcing them to answer would create frustration and potentially garbage data.</p>
+<h3>Step 4: Generating</h3>
+<p>A 5-stage loading animation plays while the <code>POST /api/generate</code> call runs in the background:</p>
+<ol>
+<li>Analyzing your idea</li>
+<li>Understanding requirements</li>
+<li>Designing architecture</li>
+<li>Optimizing prompt</li>
+<li>Generating Master Prompt</li>
+</ol>
+<p>Each stage has a timed duration. When the API call finishes (<code>isApiDone</code> becomes true), remaining stages accelerate to 400ms each.</p>
+<p><strong>Why fake loading stages?</strong> The actual API call takes 5-15 seconds. A blank spinner for 15 seconds feels broken. The staged animation communicates progress, builds anticipation, and makes the wait feel shorter (a well-documented UX principle called &quot;perceived performance&quot;). The stages also describe <em>what the AI is actually doing</em>, which builds trust.</p>
+<h3>Step 5: Results</h3>
+<p>The full generation result is displayed in collapsible <code>SectionCard</code> components. 14 sections are shown:</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Icon</th>
+<th>What it Contains</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Prompt Quality</td>
+<td>Gauge circles</td>
+<td>Before/After score comparison</td>
+</tr>
+<tr>
+<td>Optimized Prompt</td>
+<td>Sparkles</td>
+<td>Polished 2-3 sentence version of original idea</td>
+</tr>
+<tr>
+<td>Missing Requirements</td>
+<td>AlertCircle</td>
+<td>What the original prompt was missing</td>
+</tr>
+<tr>
+<td>Suggested Tech Stack</td>
+<td>Code2</td>
+<td>Frontend, backend, database, auth, hosting, deployment</td>
+</tr>
+<tr>
+<td>Recommended Features</td>
+<td>Lightbulb</td>
+<td>Core features list</td>
+</tr>
+<tr>
+<td>UI/UX Suggestions</td>
+<td>Palette</td>
+<td>Design recommendations</td>
+</tr>
+<tr>
+<td>Architecture Suggestions</td>
+<td>Layers</td>
+<td>System architecture recommendations</td>
+</tr>
+<tr>
+<td>Performance Suggestions</td>
+<td>Gauge</td>
+<td>Performance optimization tips</td>
+</tr>
+<tr>
+<td>Security Recommendations</td>
+<td>ShieldCheck</td>
+<td>Security hardening tips</td>
+</tr>
+<tr>
+<td>Folder Structure</td>
+<td>FolderTree</td>
+<td>Complete project tree in monospace</td>
+</tr>
+<tr>
+<td>Suggested APIs &amp; Services</td>
+<td>Plug</td>
+<td>Third-party integrations</td>
+</tr>
+<tr>
+<td>Future Improvements</td>
+<td>TrendingUp</td>
+<td>V2/V3 feature ideas</td>
+</tr>
+<tr>
+<td>Developer Notes</td>
+<td>StickyNote</td>
+<td>Important implementation notes</td>
+</tr>
+<tr>
+<td><strong>Master Prompt</strong></td>
+<td><strong>Sparkles</strong></td>
+<td><strong>The full, copy-pasteable prompt</strong></td>
+</tr>
+</tbody></table>
+<p>The <strong>Master Prompt</strong> card is visually distinct: it has a double-thick border with accent color, a dedicated header, and <strong>two Copy buttons</strong> (header + footer) so the user can copy from wherever they are in the scroll.</p>
+<p>Export options: <strong>MD</strong> (Markdown file), <strong>TXT</strong> (plain text file), and <strong>Copy to Clipboard</strong>.</p>
+<hr>
+<h2>Prompt Engineering</h2>
+<p>This is the core intellectual property of Catalyx AI. Three system prompts power the entire application, defined in <a href="file:///c:/Users/techa/Documents/catalyx%202/lib/prompts.ts">prompts.ts</a>.</p>
+<h3>Prompt 1: ANALYSIS_SYSTEM_PROMPT</h3>
+<p><strong>Purpose</strong>: Score the user&#39;s prompt 0-100 and generate interview questions.</p>
+<p><strong>Key Design Decisions</strong>:</p>
+<pre><code>Scoring criteria:
+- 0-20: Extremely vague, single sentence, no technical details
+- 21-40: Basic idea but missing most requirements
+- 41-60: Some details but lacks architecture, design, or constraints
+- 61-80: Good detail but missing edge cases, deployment, or UX specs
+- 81-100: Comprehensive with full technical specification
+</code></pre>
+<p><strong>Why these scoring bands?</strong> They&#39;re calibrated so that a typical first-time prompt (&quot;build me a website&quot;) scores ~15-25, which creates the maximum &quot;wow factor&quot; when the optimized score lands at ~90-97. If the initial scoring were too generous (say 50 for a vague prompt), the improvement delta would be unimpressive.</p>
+<p><strong>Question generation rules</strong>:</p>
+<ul>
+<li><strong>5-8 questions max</strong>: More than 8 causes interview fatigue. Fewer than 5 doesn&#39;t gather enough context.</li>
+<li><strong>Prefer single/multiple over text</strong>: Multiple-choice is faster to answer and produces more structured data. Text inputs are reserved for truly open-ended questions.</li>
+<li><strong>Adapt to project type</strong>: If the user says &quot;build a mobile app&quot;, the questions should ask about iOS/Android/React Native — not about server-side rendering.</li>
+<li><strong>Don&#39;t ask about things already specified</strong>: If the user mentioned &quot;React&quot;, don&#39;t ask &quot;What frontend framework?&quot;</li>
+</ul>
+<p><strong>Why <code>response_format: { type: &quot;json_object&quot; }</code>?</strong> This is Groq&#39;s structured output mode. It guarantees the response is valid JSON, eliminating an entire class of parsing errors. Without this, the LLM might return markdown-wrapped JSON, explanatory text before the JSON, or malformed JSON.</p>
+<h3>Prompt 2: INTERVIEW_SYSTEM_PROMPT</h3>
+<p><strong>Purpose</strong>: Generate 2-4 follow-up questions based on answers so far, or signal that enough information has been collected.</p>
+<p><strong>Key Design Decision</strong>: The <code>isComplete</code> boolean. This allows the AI to decide when it has enough information, rather than always generating the maximum number of follow-up rounds. This prevents over-interviewing.</p>
+<h3>Prompt 3: GENERATION_SYSTEM_PROMPT</h3>
+<p><strong>Purpose</strong>: Generate the full 14-section analysis AND the Master Prompt.</p>
+<p>This is the most complex prompt in the system (~2,500 tokens). It instructs the AI to:</p>
+<ol>
+<li>Generate structured analysis (tech stack, features, architecture, security, etc.)</li>
+<li>Generate a <strong>Master Prompt</strong> that contains 17 sections:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Master Prompt Section</th>
+<th>Why It&#39;s Included</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Project Overview</td>
+<td>The AI needs context: what is being built and for whom</td>
+</tr>
+<tr>
+<td>Core Features</td>
+<td>Without explicit features, the AI invents its own (usually wrong)</td>
+</tr>
+<tr>
+<td>Technical Stack</td>
+<td>Prevents the AI from choosing deprecated or mismatched technologies</td>
+</tr>
+<tr>
+<td>User Flow</td>
+<td>Forces step-by-step thinking about the user journey</td>
+</tr>
+<tr>
+<td>Database Schema</td>
+<td>Most prompts forget the database entirely</td>
+</tr>
+<tr>
+<td>API Endpoints</td>
+<td>Defines the contract between frontend and backend</td>
+</tr>
+<tr>
+<td>Auth &amp; Authorization</td>
+<td>Auth is always underspecified in vague prompts</td>
+</tr>
+<tr>
+<td>Design System</td>
+<td>Colors, typography, spacing — prevents generic UI</td>
+</tr>
+<tr>
+<td>Folder Structure</td>
+<td>Prevents the AI from dumping everything in one file</td>
+</tr>
+<tr>
+<td>Coding Standards</td>
+<td>Naming conventions, TypeScript strictness, component patterns</td>
+</tr>
+<tr>
+<td>Error Handling</td>
+<td>Loading states, empty states, error boundaries</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>Lighthouse targets, lazy loading, caching</td>
+</tr>
+<tr>
+<td>Accessibility</td>
+<td>WCAG 2.1 AA, keyboard nav, screen reader support</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>XSS, CSRF, input validation, env variable handling</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td>Unit tests, integration tests, key test cases</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>CI/CD, environment config, production checklist</td>
+</tr>
+<tr>
+<td>Constraints</td>
+<td>Anti-patterns to avoid, no placeholders, no incomplete code</td>
+</tr>
+</tbody></table>
+<p><strong>Why <code>max_tokens: 8192</code>?</strong> The Master Prompt alone can be 2000+ tokens. With the 14-section analysis, the total response easily exceeds 4000 tokens. 8192 ensures the response is never truncated.</p>
+<p><strong>Why <code>temperature: 0.7</code>?</strong> This balances creativity with consistency. At 0.0, the output is deterministic but robotic. At 1.0, the output is creative but unpredictable. 0.7 produces varied, natural-sounding recommendations while staying on-topic.</p>
+<p><strong>Meta-instructions embedded in the Master Prompt</strong>: The generated Master Prompt itself contains instructions for the <em>next</em> AI (the coding assistant). These meta-instructions tell the coding AI to:</p>
+<ul>
+<li>Think step by step</li>
+<li>Build production-ready code (not prototypes)</li>
+<li>Use reusable components</li>
+<li>Handle every edge case</li>
+<li>Never use placeholder content</li>
+</ul>
+<p>This is a <strong>prompt-within-a-prompt</strong> — Catalyx AI generates a prompt that is itself optimized for prompting.</p>
+<hr>
+<h2>API Routes</h2>
+<p>All three API routes follow the same pattern, defined in <a href="file:///c:/Users/techa/Documents/catalyx%202/app/api">app/api/</a>:</p>
+<pre><code class="language-typescript">export const dynamic = &quot;force-dynamic&quot;;  // Never cache API responses
+
+export async function POST(request: Request) {
+  // 1. Parse and validate input
+  // 2. Check for API key
+  // 3. Call Groq with system prompt + user prompt
+  // 4. Parse JSON response
+  // 5. Validate response shape
+  // 6. Return result (or error with appropriate HTTP status)
+}
+</code></pre>
+<h3>Error Handling Strategy</h3>
+<table>
+<thead>
+<tr>
+<th>Error Type</th>
+<th>HTTP Status</th>
+<th>User-Facing Message</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Missing/invalid input</td>
+<td>400</td>
+<td>&quot;Please provide a prompt with at least 3 characters.&quot;</td>
+</tr>
+<tr>
+<td>Missing API key</td>
+<td>500</td>
+<td>&quot;API key not configured.&quot;</td>
+</tr>
+<tr>
+<td>Empty AI response</td>
+<td>502</td>
+<td>&quot;No response from AI. Please try again.&quot;</td>
+</tr>
+<tr>
+<td>Malformed JSON from AI</td>
+<td>502</td>
+<td>&quot;Failed to parse AI response. Please try again.&quot;</td>
+</tr>
+<tr>
+<td>Invalid response shape</td>
+<td>502</td>
+<td>&quot;Received an invalid response format. Please try again.&quot;</td>
+</tr>
+<tr>
+<td>Groq rate limit</td>
+<td>429</td>
+<td>&quot;Rate limit exceeded. Please wait a moment.&quot;</td>
+</tr>
+<tr>
+<td>Unknown error</td>
+<td>500</td>
+<td>&quot;Something went wrong. Please try again.&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Why 502 for AI errors?</strong> 502 (Bad Gateway) is semantically correct: the server successfully reached the upstream service (Groq), but the upstream service returned an unusable response. This distinguishes AI failures from application failures (500).</p>
+<p><strong>Why <code>export const dynamic = &quot;force-dynamic&quot;</code>?</strong> Next.js 15+ aggressively caches route handlers. Since every API call depends on user input and produces unique results, caching would return stale data. <code>force-dynamic</code> disables caching entirely for these routes.</p>
+<hr>
+<h2>State Management</h2>
+<p>The application state is managed by a <code>useReducer</code> + <code>useContext</code> pattern in <a href="file:///c:/Users/techa/Documents/catalyx%202/lib/store.tsx">store.tsx</a>.</p>
+<h3>Why <code>useReducer</code> Instead of <code>useState</code>?</h3>
+<p>The flow has <strong>10 distinct state transitions</strong> (SET_STEP, SET_PROMPT, SET_ANALYSIS, ADD_ANSWER, ADD_QUESTIONS, SET_QUESTION_INDEX, SET_GENERATION, SET_LOADING, SET_ERROR, RESET). Managing these with individual <code>useState</code> calls would create:</p>
+<ul>
+<li>8+ state variables</li>
+<li>Complex interdependencies (e.g., setting an error should also clear <code>isLoading</code>)</li>
+<li>Race conditions between state updates</li>
+</ul>
+<p><code>useReducer</code> centralizes all transitions into a single <code>dispatch</code> function. The reducer guarantees that state transitions are atomic and predictable. For example:</p>
+<pre><code class="language-typescript">case &quot;SET_ERROR&quot;:
+  return { ...state, error: action.error, isLoading: false };
+</code></pre>
+<p>This ensures that when an error is set, <code>isLoading</code> is <em>always</em> cleared in the same render cycle. With separate <code>useState</code> calls, you&#39;d need two separate state updates, which could cause a flash of &quot;loading + error&quot; before the loading state clears.</p>
+<h3>Why <code>useContext</code> Instead of Zustand / Redux / Jotai?</h3>
+<p><strong>Simplicity</strong>. The state is only needed on the <code>/optimize</code> page, and it&#39;s consumed by at most 5 components. The overhead of installing a state management library, creating a store, defining selectors, and wiring up providers is not justified for this scope. React&#39;s built-in Context + useReducer provides exactly the right amount of structure.</p>
+<h3>The FlowStep Type</h3>
+<pre><code class="language-typescript">export type FlowStep = &quot;input&quot; | &quot;analyzing&quot; | &quot;interview&quot; | &quot;generating&quot; | &quot;results&quot;;
+</code></pre>
+<p>This is a <strong>discriminated union</strong> — TypeScript knows that <code>state.step</code> can only be one of these 5 values, never an arbitrary string. This means:</p>
+<ul>
+<li><code>if (state.step === &quot;loading&quot;)</code> would cause a compile-time error (typo caught)</li>
+<li>Exhaustive switch statements can be verified by TypeScript</li>
+<li>The <code>AnimatePresence</code> component uses <code>state.step</code> as a key for enter/exit animations</li>
+</ul>
+<hr>
+<h2>TypeScript Architecture</h2>
+<p>Every data structure in the app is defined in <a href="file:///c:/Users/techa/Documents/catalyx%202/lib/types.ts">types.ts</a>. Here&#39;s why each type exists:</p>
+<h3><code>InterviewQuestion</code></h3>
+<pre><code class="language-typescript">export interface InterviewQuestion {
+  id: string;
+  question: string;
+  type: &quot;single&quot; | &quot;multiple&quot; | &quot;text&quot;;
+  options?: string[];
+  category: string;
+}
+</code></pre>
+<p><strong>Why <code>type: &quot;single&quot; | &quot;multiple&quot; | &quot;text&quot;</code> instead of a generic <code>string</code>?</strong> This is a <strong>string literal union</strong>. The <code>InterviewCard</code> component uses this type to decide which UI to render (radio buttons, checkboxes, or textarea). If <code>type</code> were just <code>string</code>, the component would need runtime checks and could crash on unexpected values like <code>&quot;dropdown&quot;</code>.</p>
+<p><strong>Why <code>options?: string[]</code> (optional)?</strong> Text-type questions don&#39;t have options. Making it required would force every text question to include an empty array, which is unnecessary noise.</p>
+<h3><code>GenerationResult</code></h3>
+<pre><code class="language-typescript">export interface GenerationResult {
+  initialScore: number;
+  optimizedScore: number;
+  optimizedPrompt: string;
+  techStack: { frontend: string; backend: string; ... };
+  features: string[];
+  masterPrompt: string;
+  // ... 14 total fields
+}
+</code></pre>
+<p>This type mirrors the exact JSON shape returned by the Groq API. The API route validates the response against this shape before returning it to the client. If the AI returns a response missing <code>masterPrompt</code> or with <code>optimizedScore</code> as a string instead of a number, the API returns a 502 error.</p>
+<h3><code>FlowState</code></h3>
+<pre><code class="language-typescript">export interface FlowState {
+  step: FlowStep;
+  initialPrompt: string;
+  analysisResult: AnalysisResult | null;
+  interviewAnswers: InterviewAnswer[];
+  currentQuestionIndex: number;
+  generationResult: GenerationResult | null;
+  isLoading: boolean;
+  error: string | null;
+}
+</code></pre>
+<p><strong>Why <code>AnalysisResult | null</code>?</strong> The analysis result doesn&#39;t exist until the API call completes. Using <code>null</code> instead of an empty object means TypeScript forces every consumer to check <code>if (state.analysisResult)</code> before accessing properties. This prevents &quot;cannot read property of undefined&quot; errors at compile time.</p>
+<hr>
+<h2>Design System</h2>
+<p>The entire visual identity is defined in <a href="file:///c:/Users/techa/Documents/catalyx%202/app/globals.css">globals.css</a> using CSS custom properties.</p>
+<h3>OKLCH Color Space</h3>
+<p>All colors use the <strong>OKLCH</strong> color space instead of traditional hex or HSL:</p>
+<pre><code class="language-css">--color-paper: oklch(13% 0.01 260);
+--color-accent: oklch(72% 0.12 25);
+</code></pre>
+<p><strong>Why OKLCH?</strong> OKLCH (Oklab Lightness, Chroma, Hue) is perceptually uniform. This means:</p>
+<ul>
+<li>A 10% lightness change looks like the same amount of change across all hues</li>
+<li>You can create consistent color ramps by only adjusting the L (lightness) value</li>
+<li>It&#39;s impossible to accidentally create jarring, uneven color scales</li>
+</ul>
+<p>In HSL, <code>hsl(0, 100%, 50%)</code> (red) and <code>hsl(120, 100%, 50%)</code> (green) have the same &quot;lightness&quot; value but look dramatically different in brightness. OKLCH fixes this.</p>
+<h3>The 4-Level Paper System</h3>
+<pre><code class="language-css">--color-paper:   oklch(13% 0.01 260);  /* Base background */
+--color-paper-2: oklch(16% 0.01 260);  /* Card surfaces */
+--color-paper-3: oklch(20% 0.012 260); /* Input fields, hover states */
+--color-paper-4: oklch(24% 0.012 260); /* Active states */
+</code></pre>
+<p><strong>Why 4 levels?</strong> This creates visual depth without using drop shadows. Cards (<code>paper-2</code>) sit on the background (<code>paper</code>). Input fields within cards use <code>paper-3</code>. Hover states use <code>paper-4</code>. Each level is exactly 3-4% lighter, creating a consistent, subtle elevation hierarchy.</p>
+<h3>The Ink System</h3>
+<pre><code class="language-css">--color-ink:   oklch(95% 0.005 260);  /* Primary text */
+--color-ink-2: oklch(75% 0.01 260);   /* Secondary text */
+--color-ink-3: oklch(55% 0.01 260);   /* Tertiary/muted text */
+</code></pre>
+<p><strong>Why 3 levels?</strong> Headings need maximum contrast (<code>ink</code>). Body text needs high but not maximum contrast (<code>ink-2</code>). Labels, placeholders, and metadata need low contrast (<code>ink-3</code>). Three levels cover every text hierarchy in the app.</p>
+<h3>Animation Timing</h3>
+<pre><code class="language-css">--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+</code></pre>
+<p>This is a custom easing curve used throughout the app. It starts fast and decelerates smoothly — the same easing Apple uses in iOS animations. The curve <code>[0.16, 1, 0.3, 1]</code> appears in every Framer Motion transition.</p>
+<h3>Accessibility</h3>
+<pre><code class="language-css">@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 150ms !important;
+  }
+}
+</code></pre>
+<p>If the user has &quot;Reduce motion&quot; enabled in their OS settings, all animations are effectively disabled. The <code>150ms</code> transition duration preserves state-change feedback without the motion.</p>
+<hr>
+<h2>Component Architecture</h2>
+<h3><code>PromptScore</code> — SVG Ring Gauge</h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/components/prompt-score.tsx">prompt-score.tsx</a> renders an animated circular score gauge using SVG.</p>
+<p><strong>How it works</strong>:</p>
+<ol>
+<li>An SVG circle is drawn with <code>strokeDasharray={circumference}</code> (the full perimeter)</li>
+<li><code>strokeDashoffset</code> controls how much of the stroke is hidden</li>
+<li>Animating <code>strokeDashoffset</code> from <code>circumference</code> to <code>circumference - progress</code> reveals the arc</li>
+<li>The circle is rotated <code>-90deg</code> so the arc starts at 12 o&#39;clock instead of 3 o&#39;clock</li>
+</ol>
+<p><strong>Color logic</strong>: Score ≥80 = green (<code>--color-success</code>), ≥50 = yellow (<code>--color-warning</code>), &lt;50 = red (<code>--color-error</code>).</p>
+<p><strong>Count-up animation</strong>: The number counts up from 0 to the target score at 30ms intervals. This creates a &quot;slot machine&quot; effect that builds anticipation.</p>
+<h3><code>InterviewCard</code> — Adaptive Question UI</h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/components/interview-card.tsx">interview-card.tsx</a> renders three different UIs based on <code>question.type</code>:</p>
+<ul>
+<li><strong><code>&quot;single&quot;</code></strong>: Renders radio-style buttons. Selecting one auto-advances after 300ms.</li>
+<li><strong><code>&quot;multiple&quot;</code></strong>: Renders checkbox-style buttons. User must click &quot;Continue&quot;.</li>
+<li><strong><code>&quot;text&quot;</code></strong>: Renders a textarea. Enter key submits.</li>
+</ul>
+<p><strong>Why separate radio/checkbox indicators?</strong> The radio indicator is a circle (<code>rounded-full</code>). The checkbox indicator is a square (<code>rounded-[3px]</code>). This matches the user&#39;s mental model of radio vs checkbox from every form they&#39;ve ever filled out.</p>
+<h3><code>LoadingStages</code> — Staged Progress</h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/components/loading-stages.tsx">loading-stages.tsx</a> shows 5 stages with timed transitions.</p>
+<p><strong>The <code>isApiDone</code> prop</strong>: When the API call finishes before the animation completes, remaining stages accelerate from their normal duration (1200-2000ms) to 400ms each. This prevents the user from waiting for an animation to finish when the data is already ready.</p>
+<h3><code>SectionCard</code> — Collapsible Accordion</h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/components/section-card.tsx">section-card.tsx</a> is a collapsible card with animated height transitions.</p>
+<p><strong>Why <code>initial={false}</code> on the height animation?</strong> This prevents the card from animating on first render. Without it, every card would &quot;open&quot; with an animation when the results page loads, which would be distracting.</p>
+<h3><code>Header</code> — Floating Pill Navigation</h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/components/header.tsx">header.tsx</a> is a detached, centered navigation bar with backdrop blur.</p>
+<p><strong>Why fixed + floating?</strong> This is the &quot;N5 floating pill nav&quot; pattern used by Linear, Vercel, and Raycast. It stays visible during scroll, doesn&#39;t take up full width, and the backdrop blur creates depth without obscuring content.</p>
+<h3><code>CopyButton</code> — Clipboard Integration</h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/components/copy-button.tsx">copy-button.tsx</a> with two variants:</p>
+<ul>
+<li><strong><code>default</code></strong>: Small, bordered button for section-level copy</li>
+<li><strong><code>large</code></strong>: Full accent-colored button for the Master Prompt</li>
+</ul>
+<p>The button shows a checkmark + &quot;Copied&quot; for 2 seconds after clicking, then reverts to the copy icon.</p>
+<hr>
+<h2>Custom Hooks</h2>
+<h3><code>useCopyToClipboard</code></h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/lib/hooks/use-copy-to-clipboard.ts">use-copy-to-clipboard.ts</a> wraps the Clipboard API with a fallback for older browsers that uses a hidden textarea + <code>document.execCommand(&quot;copy&quot;)</code>.</p>
+<p><strong>Why the fallback?</strong> The <code>navigator.clipboard</code> API requires HTTPS and user gesture. In some environments (e.g., older WebViews, HTTP localhost), it fails silently. The fallback ensures copy always works.</p>
+<h3><code>useLocalStorage</code></h3>
+<p><a href="file:///c:/Users/techa/Documents/catalyx%202/lib/hooks/use-local-storage.ts">use-local-storage.ts</a> persists prompt history across sessions.</p>
+<p><strong>Why SSR-safe?</strong> The hook initializes with <code>initialValue</code> (not localStorage) and reads localStorage in a <code>useEffect</code>. This prevents hydration mismatches in Next.js, where the server renders with <code>initialValue</code> and the client might have different data in localStorage.</p>
+<hr>
+<h2>How Catalyx AI Stands Out</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Catalyx AI</th>
+<th>Generic Prompt Improvers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Adaptive Interview</strong></td>
+<td>AI generates project-specific questions with multi-select options</td>
+<td>Generic checklists or simple text rewriting</td>
+</tr>
+<tr>
+<td><strong>Prompt Scoring</strong></td>
+<td>Quantitative 0-100 score with visual gauge and before/after comparison</td>
+<td>No scoring or vague &quot;improved&quot; label</td>
+</tr>
+<tr>
+<td><strong>Master Prompt Structure</strong></td>
+<td>17 sections covering database schemas, API endpoints, folder structure, security, accessibility, testing</td>
+<td>Simple rewording of the original prompt</td>
+</tr>
+<tr>
+<td><strong>Meta-Instructions</strong></td>
+<td>The generated prompt contains instructions for the <em>next</em> AI (coding assistant)</td>
+<td>No awareness of downstream AI consumption</td>
+</tr>
+<tr>
+<td><strong>Speed</strong></td>
+<td>Groq LPU inference: ~500 tokens/second (4s for Master Prompt)</td>
+<td>OpenAI/Anthropic: ~80 tokens/second (25s)</td>
+</tr>
+<tr>
+<td><strong>Export</strong></td>
+<td>Copy, Markdown download, TXT download</td>
+<td>Usually just copy</td>
+</tr>
+<tr>
+<td><strong>History</strong></td>
+<td>localStorage-persisted history with score tracking</td>
+<td>No history</td>
+</tr>
+<tr>
+<td><strong>Design</strong></td>
+<td>Dark, OKLCH-based design system with Framer Motion animations</td>
+<td>Generic light theme</td>
+</tr>
+</tbody></table>
+<h3>The Key Differentiator</h3>
+<p>Most &quot;prompt improvers&quot; take your prompt and make it slightly better — like Grammarly for prompts. Catalyx AI doesn&#39;t just improve your prompt. It <strong>interviews you</strong> to extract information you didn&#39;t know was missing, then generates a <strong>complete engineering specification</strong> that covers architecture, security, accessibility, testing, and deployment. The output is not a &quot;better prompt&quot; — it&#39;s a production engineering brief.</p>
+<hr>
+<h2>Repository Structure</h2>
+<pre><code>catalyx-ai/
+├── app/
+│   ├── api/
+│   │   ├── analyze/route.ts        # Prompt scoring &amp; question generation
+│   │   ├── interview/route.ts      # Follow-up question generation
+│   │   └── generate/route.ts       # Full analysis &amp; Master Prompt
+│   ├── optimize/
+│   │   ├── page.tsx                # Optimize page wrapper (FlowProvider)
+│   │   └── optimize-flow.tsx       # Core 5-step flow (882 lines)
+│   ├── globals.css                 # OKLCH design tokens &amp; base styles
+│   ├── layout.tsx                  # Root layout (fonts, metadata, Toaster)
+│   └── page.tsx                    # Landing page (hero, features, CTA)
+├── components/
+│   ├── header.tsx                  # Floating pill navigation
+│   ├── footer.tsx                  # Footer with attribution
+│   ├── prompt-score.tsx            # SVG ring gauge with count-up
+│   ├── interview-card.tsx          # Adaptive question card (3 types)
+│   ├── loading-stages.tsx          # 5-stage animated loading
+│   ├── section-card.tsx            # Collapsible accordion card
+│   └── copy-button.tsx             # Clipboard button (2 variants)
+├── lib/
+│   ├── hooks/
+│   │   ├── use-copy-to-clipboard.ts  # Clipboard API + fallback
+│   │   └── use-local-storage.ts      # SSR-safe localStorage
+│   ├── prompts.ts                  # 3 system prompts + builder functions
+│   ├── store.tsx                   # FlowProvider (Context + useReducer)
+│   ├── types.ts                    # All TypeScript interfaces
+│   └── utils.ts                    # cn(), downloadAsFile(), generateId()
+├── public/
+│   └── screenshots/preview.png     # README screenshot
+├── .env.local                      # GROQ_API_KEY (gitignored)
+├── .gitignore
+├── next.config.ts
+├── package.json
+├── postcss.config.mjs
+├── tsconfig.json
+└── README.md
+</code></pre>
+<p><strong>Total source files</strong>: 19 files<br><strong>Total lines of custom code</strong>: ~2,800 lines<br><strong>External dependencies</strong>: 10 runtime, 7 dev<br><strong>Build time</strong>: ~5.5 seconds (Turbopack)<br><strong>Bundle</strong>: Zero unnecessary dependencies, tree-shaken icons</p>
+<hr>
+<blockquote>
+<p><em>Built by Sahil Arora. Powered by Groq, Next.js, and an unreasonable amount of prompt engineering.</em></p>
+</blockquote>
+
+  <script>
+    document.querySelectorAll('code.language-mermaid').forEach(el => {
+      const parent = el.parentElement;
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = el.textContent;
+      parent.replaceWith(div);
+    });
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

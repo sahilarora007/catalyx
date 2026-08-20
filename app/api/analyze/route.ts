@@ -1,9 +1,5 @@
-import Groq from "groq-sdk";
+import { groqWithRetry, GROQ_MODEL } from "@/lib/groq-client";
 import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisUserPrompt } from "@/lib/prompts";
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
 
 export const dynamic = "force-dynamic";
 
@@ -25,15 +21,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+    const completion = await groqWithRetry({
+      model: GROQ_MODEL,
       messages: [
         { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: buildAnalysisUserPrompt(prompt.trim()) },
       ],
       temperature: 0.7,
-      max_tokens: 2048,
+      max_tokens: 1024,
       response_format: { type: "json_object" },
+      // @ts-expect-error: groq-sdk types don't expose reasoning_effort yet
+      reasoning_effort: "none",
     });
 
     const content = completion.choices[0]?.message?.content;
