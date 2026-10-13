@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight,
   Sparkles,
   RotateCcw,
   AlertCircle,
@@ -69,26 +68,6 @@ export function OptimizeFlow() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Keyboard shortcut: Cmd/Ctrl+Enter to submit
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && state.step === "input") {
-        e.preventDefault();
-        if (prompt.trim().length >= 3) handleAnalyze();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prompt, state.step]);
-
-  // Auto-scroll to results
-  useEffect(() => {
-    if (state.step === "results" && resultsRef.current) {
-      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [state.step]);
-
   const handleAnalyze = async () => {
     if (prompt.trim().length < 3) return;
 
@@ -127,53 +106,10 @@ export function OptimizeFlow() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong";
       dispatch({ type: "SET_ERROR", error: message });
+      dispatch({ type: "SET_STEP", step: "input" });
       toast.error(message);
     }
   };
-
-  const handleInterviewAnswer = useCallback(
-    (answer: string | string[]) => {
-      if (!state.analysisResult) return;
-
-      const questions = state.analysisResult.interviewQuestions;
-      const currentQ = questions[state.currentQuestionIndex];
-
-      const newAnswer: InterviewAnswer = {
-        questionId: currentQ.id,
-        answer,
-      };
-
-      dispatch({ type: "ADD_ANSWER", answer: newAnswer });
-
-      if (state.currentQuestionIndex + 1 < questions.length) {
-        dispatch({
-          type: "SET_QUESTION_INDEX",
-          index: state.currentQuestionIndex + 1,
-        });
-      } else {
-        // Interview complete — start generation
-        handleGenerate([...state.interviewAnswers, newAnswer]);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.analysisResult, state.currentQuestionIndex, state.interviewAnswers]
-  );
-
-  const handleSkipQuestion = useCallback(() => {
-    if (!state.analysisResult) return;
-
-    const questions = state.analysisResult.interviewQuestions;
-
-    if (state.currentQuestionIndex + 1 < questions.length) {
-      dispatch({
-        type: "SET_QUESTION_INDEX",
-        index: state.currentQuestionIndex + 1,
-      });
-    } else {
-      handleGenerate(state.interviewAnswers);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.analysisResult, state.currentQuestionIndex, state.interviewAnswers]);
 
   const handleGenerate = async (answers: InterviewAnswer[]) => {
     dispatch({ type: "SET_STEP", step: "generating" });
@@ -222,9 +158,54 @@ export function OptimizeFlow() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong";
       dispatch({ type: "SET_ERROR", error: message });
+      dispatch({ type: "SET_STEP", step: "input" });
       toast.error(message);
     }
   };
+
+  const handleInterviewAnswer = useCallback(
+    (answer: string | string[]) => {
+      if (!state.analysisResult) return;
+
+      const questions = state.analysisResult.interviewQuestions;
+      const currentQ = questions[state.currentQuestionIndex];
+
+      const newAnswer: InterviewAnswer = {
+        questionId: currentQ.id,
+        answer,
+      };
+
+      dispatch({ type: "ADD_ANSWER", answer: newAnswer });
+
+      if (state.currentQuestionIndex + 1 < questions.length) {
+        dispatch({
+          type: "SET_QUESTION_INDEX",
+          index: state.currentQuestionIndex + 1,
+        });
+      } else {
+        // Interview complete — start generation
+        handleGenerate([...state.interviewAnswers, newAnswer]);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.analysisResult, state.currentQuestionIndex, state.interviewAnswers]
+  );
+
+  const handleSkipQuestion = useCallback(() => {
+    if (!state.analysisResult) return;
+
+    const questions = state.analysisResult.interviewQuestions;
+
+    if (state.currentQuestionIndex + 1 < questions.length) {
+      dispatch({
+        type: "SET_QUESTION_INDEX",
+        index: state.currentQuestionIndex + 1,
+      });
+    } else {
+      handleGenerate(state.interviewAnswers);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.analysisResult, state.currentQuestionIndex, state.interviewAnswers]);
 
   const handleLoadingComplete = useCallback(() => {
     dispatch({ type: "SET_STEP", step: "results" });
@@ -236,6 +217,26 @@ export function OptimizeFlow() {
     setApiDone(false);
     textareaRef.current?.focus();
   };
+
+  // Keyboard shortcut: Cmd/Ctrl+Enter to submit
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && state.step === "input") {
+        e.preventDefault();
+        if (prompt.trim().length >= 3) handleAnalyze();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prompt, state.step]);
+
+  // Auto-scroll to results
+  useEffect(() => {
+    if (state.step === "results" && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [state.step]);
 
   const handleExportMarkdown = () => {
     if (!state.generationResult) return;

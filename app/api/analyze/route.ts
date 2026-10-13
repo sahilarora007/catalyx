@@ -1,4 +1,4 @@
-import { groqWithRetry, GROQ_MODEL } from "@/lib/groq-client";
+import { groqWithRetry, GROQ_MODEL, safeParseJson } from "@/lib/groq-client";
 import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisUserPrompt } from "@/lib/prompts";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +14,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!process.env.GROQ_API_KEY) {
+    if (!process.env.OPENROUTER_API_KEY && !process.env.GROQ_API_KEY) {
       return Response.json(
-        { error: "API key not configured. Please add GROQ_API_KEY to your environment." },
+        { error: "API key not configured. Please add OPENROUTER_API_KEY to your environment." },
         { status: 500 }
       );
     }
@@ -28,10 +28,7 @@ export async function POST(request: Request) {
         { role: "user", content: buildAnalysisUserPrompt(prompt.trim()) },
       ],
       temperature: 0.7,
-      max_tokens: 1024,
-      response_format: { type: "json_object" },
-      // @ts-expect-error: groq-sdk types don't expose reasoning_effort yet
-      reasoning_effort: "none",
+      max_tokens: 4000,
     });
 
     const content = completion.choices[0]?.message?.content;
@@ -43,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = JSON.parse(content);
+    const result = safeParseJson<any>(content);
 
     // Validate required fields
     if (
@@ -68,9 +65,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const groqError = error as { status?: number; message?: string };
+    const aiError = error as { status?: number; message?: string };
 
-    if (groqError.status === 429) {
+    if (aiError.status === 429) {
       return Response.json(
         { error: "Rate limit exceeded. Please wait a moment and try again." },
         { status: 429 }
@@ -78,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     return Response.json(
-      { error: "Something went wrong. Please try again." },
+      { error: (error as Error)?.message || "Something went wrong. Please try again." },
       { status: 500 }
     );
   }

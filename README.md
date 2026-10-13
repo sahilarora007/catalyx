@@ -1,33 +1,33 @@
 # ⚡️ Catalyx AI
 
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Groq](https://img.shields.io/badge/Groq-f3f3f3?style=for-the-badge&logo=groq&logoColor=black)](https://groq.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 > **Stop fighting AI. Start giving it instructions it actually understands.**
 
-**Catalyx AI** is an intelligent prompt optimizer SaaS. It takes your vague, half-baked project ideas (like *"build me a website"*) and grills you through a beautiful, adaptive interview to produce a highly detailed, principal-engineer-grade **Master Prompt** ready to be fed into Cursor, Bolt, Lovable, Claude Code, or Gemini.
-
-![Catalyx AI Preview](public/screenshots/preview.png)
+**Catalyx AI** is an intelligent prompt optimizer. It takes your vague project ideas and grills you through an adaptive interview to produce a highly detailed, principal-engineer-grade **Master Prompt** ready to be fed into Cursor, Bolt, Lovable, Claude Code, or Gemini.
 
 ---
 
 ## 🛠️ The Prompt-to-Master Flow
 
-1. **The Vague Input**: You type something incredibly lazy. We score it out of 100 (spoiler: it's probably a 20).
-2. **The Interrogation**: Our AI analyzes the prompt, identifies missing details, and starts an adaptive interview. No infinite chat logs, just elegant multi-select option cards.
-3. **The Generation**: We spin up a highly detailed, 14-section **Master Prompt** containing database schemas, folder structures, API routes, security specifications, and explicit instructions to prevent the coding AI from generating lazy placeholders.
+1. **Vague Input** — You type something lazy. We score it out of 100 (spoiler: it's probably a 20).
+2. **Interrogation** — The AI analyzes your prompt, identifies missing details, and runs an adaptive interview with multi-select option cards.
+3. **Generation** — A highly detailed, 14-section **Master Prompt** is compiled: database schemas, folder structures, API routes, security specs, and explicit instructions to prevent placeholder code.
 
 ---
 
 ## ⚡️ Tech Stack
 
-- **Core**: Next.js 15 (App Router), TypeScript, React 19
-- **Style**: Tailwind CSS v4, Lucide Icons, Framer Motion
-- **AI Brain**: Groq API (`llama-3.3-70b-versatile`)
-- **State**: React Context (pure, no-bloat state machine)
+| Layer | Technology |
+|---|---|
+| **Framework** | Next.js 16 (App Router), TypeScript, React 19 |
+| **Styling** | Tailwind CSS v4, Lucide Icons, Framer Motion |
+| **AI Model** | OpenRouter API — `inclusionai/ling-3.1-flash` |
+| **State** | React `useReducer` finite state machine (no external library) |
+| **Rate Limiting** | Exponential backoff retry (`lib/groq-client.ts`) |
 
 ---
 
@@ -44,10 +44,10 @@ npm install
 Create a `.env.local` file at the root:
 
 ```env
-GROQ_API_KEY=your_groq_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
 
-*Get your API key at [console.groq.com](https://console.groq.com).*
+*Get your API key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys).*
 
 ### 3. Run Development Server
 
@@ -55,7 +55,7 @@ GROQ_API_KEY=your_groq_api_key_here
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) and start generating prompts that actually compile.
+Visit [http://localhost:3000](http://localhost:3000).
 
 ---
 
@@ -64,16 +64,35 @@ Visit [http://localhost:3000](http://localhost:3000) and start generating prompt
 ```
 ├── app/
 │   ├── api/
-│   │   ├── analyze/       # Scoring & initial gap analysis
-│   │   ├── interview/     # Next adaptive question generation
-│   │   └── generate/      # Full Master Prompt compilation
-│   ├── optimize/          # The core SaaS multi-step app flow
-│   ├── globals.css        # Dark mode oklch design system tokens
-│   └── page.tsx           # Premium SaaS landing page
-├── components/            # Reusable UI components (floating nav, score gauge, etc.)
-├── lib/                   # Store, custom hooks, and prompt templates
+│   │   ├── analyze/       # Scoring & initial gap analysis      (~1024 max tokens)
+│   │   ├── interview/     # Adaptive follow-up question gen     (~512 max tokens)
+│   │   └── generate/      # Full Master Prompt compilation      (~4096 max tokens)
+│   ├── optimize/          # Multi-step SaaS flow (FSM-driven)
+│   ├── globals.css        # Dark mode OKLCH design system tokens
+│   └── page.tsx           # Landing page
+├── components/            # Reusable UI components
+├── lib/
+│   ├── groq-client.ts     # Shared Groq instance + retry logic
+│   ├── prompts.ts         # System & user prompts for all API routes
+│   ├── store.tsx          # useReducer FSM — global app state
+│   ├── types.ts           # TypeScript interfaces
+│   └── utils.ts           # Formatting & download helpers
 └── public/                # Assets & screenshots
 ```
+
+---
+
+## 🔁 Rate Limit Handling
+
+Catalyx AI uses a **shared Groq client** (`lib/groq-client.ts`) with automatic exponential backoff on HTTP 429 responses:
+
+| Attempt | Wait before retry |
+|---|---|
+| 1st retry | 8 seconds |
+| 2nd retry | 16 seconds |
+| 3rd retry | 32 seconds |
+
+`max_tokens` are tightly bounded per route to stay within the 8k tokens/minute free tier limit.
 
 ---
 
