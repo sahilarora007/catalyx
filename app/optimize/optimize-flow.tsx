@@ -167,8 +167,13 @@ export function OptimizeFlow() {
     (answer: string | string[]) => {
       if (!state.analysisResult) return;
 
-      const questions = state.analysisResult.interviewQuestions;
+      const questions = state.analysisResult.interviewQuestions || [];
       const currentQ = questions[state.currentQuestionIndex];
+
+      if (!currentQ) {
+        handleGenerate(state.interviewAnswers);
+        return;
+      }
 
       const newAnswer: InterviewAnswer = {
         questionId: currentQ.id,
@@ -194,7 +199,7 @@ export function OptimizeFlow() {
   const handleSkipQuestion = useCallback(() => {
     if (!state.analysisResult) return;
 
-    const questions = state.analysisResult.interviewQuestions;
+    const questions = state.analysisResult.interviewQuestions || [];
 
     if (state.currentQuestionIndex + 1 < questions.length) {
       dispatch({
@@ -427,23 +432,26 @@ export function OptimizeFlow() {
         )}
 
         {/* ── Step 3: Interview ── */}
-        {state.step === "interview" && state.analysisResult && (
-          <motion.div key="interview" {...fadeVariants} className="py-4">
-            <InterviewCard
-              question={
-                state.analysisResult.interviewQuestions[
-                  state.currentQuestionIndex
-                ]
-              }
-              currentIndex={state.currentQuestionIndex}
-              totalQuestions={
-                state.analysisResult.interviewQuestions.length
-              }
-              onAnswer={handleInterviewAnswer}
-              onSkip={handleSkipQuestion}
-            />
-          </motion.div>
-        )}
+        {state.step === "interview" &&
+          state.analysisResult &&
+          state.analysisResult.interviewQuestions &&
+          state.analysisResult.interviewQuestions[state.currentQuestionIndex] && (
+            <motion.div key="interview" {...fadeVariants} className="py-4">
+              <InterviewCard
+                question={
+                  state.analysisResult.interviewQuestions[
+                    state.currentQuestionIndex
+                  ]
+                }
+                currentIndex={state.currentQuestionIndex}
+                totalQuestions={
+                  state.analysisResult.interviewQuestions.length
+                }
+                onAnswer={handleInterviewAnswer}
+                onSkip={handleSkipQuestion}
+              />
+            </motion.div>
+          )}
 
         {/* ── Step 4: Generating ── */}
         {state.step === "generating" && (

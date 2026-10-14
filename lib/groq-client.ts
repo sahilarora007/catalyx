@@ -1,14 +1,14 @@
 /**
  * Catalyx AI — LLM Client (OpenRouter & Fallback)
- * Model: inclusionai/ling-3.1-flash
+ * Model: google/gemma-4-26b-a4b-it:free
  */
 
-export const GROQ_MODEL = "inclusionai/ling-3.1-flash";
-export const AI_MODEL = "inclusionai/ling-3.1-flash";
+export const GROQ_MODEL = "google/gemma-4-26b-a4b-it:free";
+export const AI_MODEL = "google/gemma-4-26b-a4b-it:free";
 
-/** Fallback models on OpenRouter if primary is temporarily rate-limited */
+/** Fallback models on OpenRouter (max 3 allowed by OpenRouter API) */
 const FALLBACK_MODELS = [
-  "inclusionai/ling-3.1-flash",
+  "google/gemma-4-26b-a4b-it:free",
   "google/gemma-4-31b-it:free",
   "nvidia/nemotron-3.5-lightning:free",
 ];
@@ -134,16 +134,13 @@ export async function groqWithRetry(
     throw new Error("API key not configured. Please set OPENROUTER_API_KEY.");
   }
 
-  // Prepare payload for OpenRouter (strip unsupported fields)
+  // Prepare payload for OpenRouter
   const bodyPayload: Record<string, unknown> = {
     models: FALLBACK_MODELS,
     messages: params.messages,
     temperature: params.temperature ?? 0.7,
+    max_tokens: params.max_tokens ?? 10000,
   };
-
-  if (params.max_tokens) {
-    bodyPayload.max_tokens = params.max_tokens;
-  }
 
   let lastError: unknown;
 

@@ -23,6 +23,10 @@ export function InterviewCard({
   const [selected, setSelected] = useState<string[]>([]);
   const [textValue, setTextValue] = useState("");
 
+  if (!question) {
+    return null;
+  }
+
   const handleSingleSelect = (option: string) => {
     setSelected([option]);
     // Auto-advance after a brief delay for single-select
@@ -47,7 +51,7 @@ export function InterviewCard({
 
   return (
     <motion.div
-      key={question.id}
+      key={question.id || `q-${currentIndex}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -58,7 +62,7 @@ export function InterviewCard({
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-[var(--color-ink-3)] uppercase tracking-wider">
-            {question.category}
+            {question.category || "General"}
           </span>
           <span className="text-xs text-[var(--color-ink-3)] tabular-nums">
             {currentIndex + 1} / {totalQuestions}

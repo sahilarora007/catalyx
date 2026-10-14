@@ -31,9 +31,20 @@ function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "SET_STEP":
       return { ...state, step: action.step, error: null };
     case "SET_PROMPT":
-      return { ...state, initialPrompt: action.prompt };
+      return {
+        ...state,
+        initialPrompt: action.prompt,
+        currentQuestionIndex: 0,
+        interviewAnswers: [],
+        generationResult: null,
+      };
     case "SET_ANALYSIS":
-      return { ...state, analysisResult: action.result };
+      return {
+        ...state,
+        analysisResult: action.result,
+        currentQuestionIndex: 0,
+        interviewAnswers: [],
+      };
     case "ADD_ANSWER":
       return {
         ...state,
